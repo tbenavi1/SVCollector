@@ -73,12 +73,13 @@ void parse_tmp_file(std::string tmp_file, int id_to_ignore, std::vector<double> 
 	system(ss.str().c_str());
 }
 
-std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::vector<std::string> & names, double &num_snp, std::string output, bool use_alleles) {
+std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::vector<std::string> & names, double &num_snp, std::string output, bool use_alleles, std::map<std::string, bool> subsample_names) {
 	std::cout << "Initial assessment of VCF:" << endl;
 	std::string buffer;
 	std::ifstream myfile;
 	std::vector<double> matrix;
 	myfile.open(vcf_file.c_str(), std::ifstream::in);
+  std::map<int, bool> subsample_cols;
 	if (!myfile.good()) {
 		std::cout << "VCF Parser: could not open file: " << vcf_file.c_str() << std::endl;
 		exit(0);
@@ -106,8 +107,12 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 				}
 				if (buffer[i] == '\t') {
 					if (!id.empty()) {
-						names.push_back(id);
-						id = "";
+						if (subsample_names[id]) {
+							std::cout << "Sample in Subsample: " << id.c_str() << std::endl;
+							subsample_cols[count] = true;
+							names.push_back(id);
+							id = "";
+						}
 					}
 					count++;
 				}
@@ -134,12 +139,13 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 					af = atof(&buffer[i + 4]);
 				}
 				if (count >= 9 && buffer[i - 1] == '\t') {
-					if (genotype_parse(&buffer[i])) {
-						entries[num] = '1';
-						alleles++;
+					if (subsample_cols[count]) { //if this is a sample in our subsample
+						if (genotype_parse(&buffer[i])) {
+							entries[num] = '1';
+							alleles++;
+						}
+						num++;
 					}
-					num++;
-
 				}
 				if (buffer[i] == '\t') {
 					count++;
@@ -148,7 +154,7 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 			if (alleles > (double) min_allele_count) {
 				//std::stringstream ss;
 				double freq = 1;
-				if (use_alleles && af > -1) { // if AF is given in the format field.
+				if (use_alleles && af > -1) { // if AF is given in the format field. would need to change this for using subsample if use_alleles is true, for now we don't care about this
 					freq = af;
 				} else if (use_alleles) { //else we compute it:
 					cerr<<"We compute"<<endl;
@@ -220,21 +226,21 @@ std::map<std::string, bool> parse_names(std::string preselected_file) {
 
 }
 
-void select_greedy(std::string vcf_file, int min_allele_count, int num_samples, int alleles, std::string output, std::string preselected_file) {
+void select_greedy(std::string vcf_file, int min_allele_count, int num_samples, int alleles, std::string output, std::string subsample_file) {
 	std::vector<std::string> sample_names;
 	double total_svs = 0;
 
-	std::map<std::string, bool> preselected_names;
-	if (!preselected_file.empty()) {
-		cout << "Parsing preselected names:";
-		preselected_names = parse_names(preselected_file);
-		cout<<preselected_names.size()<<endl;
+	std::map<std::string, bool> subsample_names;
+	if (!subsample_file.empty()) {
+		cout << "Parsing subsample names:";
+		subsample_names = parse_names(subsample_file);
+		cout<<subsample_names.size()<<endl;
 	}
 
 	//we can actually just use a vector instead!
 	std::string tmp_file = output;
 	tmp_file += "_tmp";
-	std::vector<double> svs_count_mat = prep_file(vcf_file, min_allele_count, sample_names, total_svs, tmp_file, (bool) (alleles == 1));
+	std::vector<double> svs_count_mat = prep_file(vcf_file, min_allele_count, sample_names, total_svs, tmp_file, (bool) (alleles == 1), subsample_names);
 	cout << "Total SV: " << total_svs << endl;
 
 	FILE *file;
@@ -251,7 +257,7 @@ void select_greedy(std::string vcf_file, int min_allele_count, int num_samples, 
 		//select max on main diag
 		double max = 0;
 		int max_id = -1;
-		if (i >= preselected_names.size()) {
+		if (i >= 0) { //preselected_names.size() changed to 0
 			//select based on greedy:
 			for (size_t j = 0; j < sample_names.size(); j++) {
 				//cout<<"Mat "<<svs_count_mat[i]<<endl;
@@ -261,24 +267,24 @@ void select_greedy(std::string vcf_file, int min_allele_count, int num_samples, 
 					//	cout<<"test: "<<max << " "<<max_id<<endl;
 				}
 			}
-		} else { //take from pre selection
-			std::map<std::string, bool>::iterator p=preselected_names.begin();
-			size_t j=0;
-			while(j<i){// very strange..
-				p++;
-				j++;
-			}
+		} //else { //take from pre selection
+			//std::map<std::string, bool>::iterator p=preselected_names.begin();
+			//size_t j=0;
+			//while(j<i){// very strange..
+			//	p++;
+			//	j++;
+			//}
 
-			std::string name=(*p).first;
-			for(size_t j=0;j<sample_names.size();j++){
-				if(strcmp(sample_names[j].c_str(),name.c_str())==0){
-					max_id = j;
-					cout<<"Preselected hit"<<endl;
-					max = svs_count_mat[j];
-					break;
-				}
-			}
-		}
+			//std::string name=(*p).first;
+			//for(size_t j=0;j<sample_names.size();j++){
+			//	if(strcmp(sample_names[j].c_str(),name.c_str())==0){
+			//		max_id = j;
+			//		cout<<"Preselected hit"<<endl;
+			//		max = svs_count_mat[j];
+			//		break;
+			//	}
+			//}
+		//}
 		if (max == 0) {
 			std::cerr << "No more samples to select from" << std::endl;
 			break;
@@ -312,7 +318,8 @@ void select_topN(std::string vcf_file, int num_samples, std::string output) {
 
 	std::string tmp_file = output;
 	tmp_file += "_tmp";
-	std::vector<double> svs_count_mat = prep_file(vcf_file, 0, sample_names, total_svs, tmp_file, false);
+	std::map<std::string, bool> dummy; // added dummy variable
+	std::vector<double> svs_count_mat = prep_file(vcf_file, 0, sample_names, total_svs, tmp_file, false, dummy);
 	cout << "Total SV: " << total_svs << endl;
 	std::vector<double> initial_counts = svs_count_mat;
 
@@ -367,7 +374,8 @@ void select_random(std::string vcf_file, int num_samples, std::string output) {
 //we can actually just use a vector instead!
 	std::string tmp_file = output;
 	tmp_file += "_tmp";
-	std::vector<double> svs_count_mat = prep_file(vcf_file, 0, sample_names, total_svs, tmp_file, false);
+	std::map<std::string, bool> dummy; // added dummy variable
+	std::vector<double> svs_count_mat = prep_file(vcf_file, 0, sample_names, total_svs, tmp_file, false, dummy);
 //print_mat(svs_count_mat);
 
 	std::vector<int> ids; // just to avoid that the same ID is picked twice.

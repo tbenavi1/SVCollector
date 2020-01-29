@@ -42,7 +42,8 @@ int main(int argc, char **argv) {
 				std::cerr << "Min allele count (-1 to disable)" << std::endl;
 				std::cerr << "Number of samples to select" << std::endl;
 				std::cerr << "Take AF into account (1) or not (0) per allele" << std::endl;
-				std::cerr << "Optionally: File of names to select anyways" << std::endl;
+				//std::cerr << "Optionally: File of names to select anyways" << std::endl;
+				std::cerr << "Optionally: File of names in subsample" << std::endl;
 				std::cerr << "Output file" << std::endl;
 			}
 			exit(0);
