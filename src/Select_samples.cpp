@@ -118,7 +118,11 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 				}
 			}
 			if (!id.empty()) {
-				names.push_back(id);
+				if (subsample_names[id]) {
+					std::cout << "Sample in Subsample: " << id.c_str() << std::endl;
+					subsample_cols[count] = true;
+					names.push_back(id);
+				}
 			}
 
 		} else if (buffer[0] != '#') { //parse variants;
