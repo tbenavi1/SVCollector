@@ -9,7 +9,7 @@
 
 bool genotype_parse(char * buffer) {
 //buffer[0] == '.'
-  if (buffer[0] == '0' && !(buffer[1] == '|' || buffer[1] == '/')) {
+	if (buffer[0] == '0' && !(buffer[1] == '|' || buffer[1] == '/')) {
 		return false;
 	}
 	if (((buffer[0] == '0' && buffer[2] == '0')) || (strncmp(buffer, "./.:0", 5) == 0 || strncmp(buffer, "./.:.", 5) == 0) || buffer[0] == '.') {
@@ -82,7 +82,7 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 	std::ifstream myfile;
 	std::vector<double> matrix;
 	myfile.open(vcf_file.c_str(), std::ifstream::in);
-  std::map<int, bool> subsample_cols;
+	std::map<int, bool> subsample_cols;
 	if (!myfile.good()) {
 		std::cout << "VCF Parser: could not open file: " << vcf_file.c_str() << std::endl;
 		exit(0);
