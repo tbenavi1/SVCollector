@@ -9,6 +9,9 @@
 
 bool genotype_parse(char * buffer) {
 //buffer[0] == '.'
+  if (buffer[0] == '0' && !(buffer[1] == '|' || buffer[1] == '/')) {
+		return false;
+	}
 	if (((buffer[0] == '0' && buffer[2] == '0')) || (strncmp(buffer, "./.:0", 5) == 0 || strncmp(buffer, "./.:.", 5) == 0) || buffer[0] == '.') {
 		return false;
 	}
@@ -97,6 +100,7 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 	getline(myfile, buffer);
 	int line = 0;
 	num_snp = 0;
+	//std::vector<std::string> ids;
 	while (!myfile.eof()) {
 		if (names.empty() && (buffer[0] == '#' && buffer[1] == 'C')) { //parse names
 			int count = 0;
@@ -111,8 +115,8 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 							std::cout << "Sample in Subsample: " << id.c_str() << std::endl;
 							subsample_cols[count] = true;
 							names.push_back(id);
-							id = "";
 						}
+						id = "";
 					}
 					count++;
 				}
@@ -138,7 +142,12 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 			double af = -1; //just used for adams selection.
 			std::string entries = "";
 			entries.resize(names.size(), '0');
+			//std::string id = ""; //id of variant
+			//std::vector<std::string> ids; //vector of variant ids
 			for (size_t i = 0; i < buffer.size() && buffer[i] != '\0' && buffer[i] != '\n' && num < names.size(); i++) {
+				//if (count == 2 && buffer[i] != '\t') {
+				//	id += buffer[i];
+				//}
 				if (count == 7 && strncmp(&buffer[i], ";AF=", 4) == 0) {
 					af = atof(&buffer[i + 4]);
 				}
@@ -157,6 +166,7 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 			}
 			if (alleles > (double) min_allele_count) {
 				//std::stringstream ss;
+				//ids.push_back(id); //if the variant is present in the subsample, then add the id of the variant to ids, reset id name.
 				double freq = 1;
 				if (use_alleles && af > -1) { // if AF is given in the format field. would need to change this for using subsample if use_alleles is true, for now we don't care about this
 					freq = af;
@@ -189,10 +199,17 @@ std::vector<double> prep_file(std::string vcf_file, int min_allele_count, std::v
 					std::cout << "\tentries: " << line << std::endl;
 				}
 			}
+			//id = ""; //reset id name after finish parsing variant, don't think I need this, id is reinitialized after every new variant
 		}
 		getline(myfile, buffer);
 	}
 //	cout << "done2 " << endl;
+	//ofstream file_test;
+	//file_test.open("ids.txt");
+	//for (std::vector<std::string>::iterator it = ids.begin(); it != ids.end(); ++it) {
+	//	file_test << *it << "\n";
+	//}
+  //file_test.close();
 	fclose(file);
 	myfile.close();
 	return matrix;
